@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="ko" style="background-color: white; color: black;">
+<head>
+  <meta charset="UTF-8" />
+  <title>이차방정식 빈출 (2)</title>
+  <!-- MathJax for rendering LaTeX -->
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" defer></script>
+  <style>
+    body {
+      margin: 20px;
+      font-family: sans-serif;
+    }
+    .question-container {
+      margin-top: 20px;
+      border: 1px solid black;
+      padding: 10px;
+    }
+    .choices-container {
+      margin-top: 10px;
+    }
+    .choice-button {
+      display: block;
+      margin: 5px 0;
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+      cursor: pointer;
+      width: 200px;
+    }
+    .info {
+      margin-top: 10px;
+    }
+    .energy-bar {
+      width: 100%;
+      background-color: #eee;
+      height: 10px;
+      position: relative;
+      margin: 10px 0;
+    }
+    .energy-bar-fill {
+      background-color: black;
+      height: 100%;
+      width: 100%;
+      transition: width 0.2s linear;
+    }
+    .hidden {
+      display: none;
+    }
+    .danger {
+      color: red;
+      font-weight: bold;
+    }
+    #response {
+      white-space: pre-wrap;
+      border: 1px solid #999;
+      padding: 10px;
+      margin-top: 10px;
+    }
+    #game-container {
+      margin-top: 10px;
+    }
+    .disabled {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    button {
+      background-color: #fff;
+      color: #000;
+      border: 1px solid #000;
+      padding: 5px 10px;
+      margin: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #000;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+
+<h1>이차방정식 빈출 (2)</h1>
+
+<!-- 난이도, 이름 입력 화면 -->
+<div id="start-screen">
+  <div>
+    <label>이름: <input type="text" id="playerName" /></label>
+  </div>
+  <div style="margin-top:10px;">
+    난이도 선택:
+    <select id="difficultySelect">
+      <option value="하">하 (시간 제한 없음, 문제당 10점)</option>
+      <option value="중">중 (문제당 40초, 13점)</option>
+      <option value="상">상 (문제당 30초, 15점)</option>
+      <option value="최상">최상 (문제당 20초, 20점)</option>
+    </select>
+  </div>
+  <div style="margin-top:10px;">
+    <button onclick="startGame()">게임 시작</button>
+  </div>
+</div>
+
+<!-- 전체 게임 진행 화면 -->
+<div id="game-container" class="hidden">
+  <div>
+    <span>남은 기회: <span id="lifeCount">3</span></span>
+    &nbsp;|&nbsp;
+    <span>현재 점수: <span id="scoreDisplay">0</span></span>
+    &nbsp;|&nbsp;
+    <span>전체 진행 시간: <span id="totalTimeDisplay">0</span>초</span>
+  </div>
+  <div id="energyBarContainer" class="energy-bar hidden">
+    <div id="energyBarFill" class="energy-bar-fill"></div>
+  </div>
+
+  <div id="questionArea" class="question-container">
+    <!-- 문제 표시 영역 -->
+    <div id="questionText"></div>
+    <!-- 보기 표시 영역 -->
+    <div id="choices" class="choices-container"></div>
+    <!-- 정답/오답 표시 영역 -->
+    <div id="feedback" class="info"></div>
+    <!-- 다음 문제 버튼 -->
+    <button id="nextButton" class="hidden" onclick="handleNext()">다음 문제</button>
+  </div>
+</div>
+
+<!-- 게임 종료 화면 -->
+<div id="end-screen" class="hidden">
+  <h2>게임 종료!</h2>
+  <p>최종 점수: <span id="finalScore"></span></p>
+  <p>총 소요 시간: <span id="finalTime"></span>초</p>
+  <button onclick="sendScore()">점수전송</button>
+  <div id="response"></div>
+</div>
+
+<script>
+// 문제 데이터 (문항번호는 생략, 무작위로 배치 예정)
+// 각 problem: {question, choices, correct}
+// 모든 수식은 \\(...\\) 형태를 사용하되, 분수는 \\(\\dfrac{}{}\\)로 표기
+// 여기서는 보기 최대 5개로 통일
+
+const problems = [
+  {
+    question: "이차방정식 \\(x^2 + 4x + 2 = 0\\)의 서로 다른 두 실근을 \\(\\alpha,\\beta\\)라 할 때, \\(\\dfrac{1}{\\lvert \\alpha\\rvert} + \\dfrac{1}{\\lvert \\beta\\rvert}\\)의 값은?",
+    choices: ["\\(\\dfrac{1}{2}\\)", "1", "\\(\\dfrac{3}{2}\\)", "2", "\\(\\dfrac{5}{2}\\)"],
+    correct: 3
+  },
+  {
+    question: "이차방정식 \\(x^2 - 3x + 1 = 0\\)의 두 근을 \\(\\alpha,\\beta\\)라 할 때, \\(\\sqrt{\\alpha} + \\sqrt{\\beta}\\)의 값은?",
+    choices: ["\\(\\sqrt{3}\\)", "2", "\\(\\sqrt{5}\\)", "\\(\\sqrt{6}\\)", "\\(\\sqrt{7}\\)"],
+    correct: 2
+  },
+  {
+    question: "\\(\\lvert x^2 - (a+4)x + a^2 \\rvert = 3\\)의 한 근이 4일 때, 가능한 모든 실수 \\(a\\) 값의 곱은?",
+    choices: ["-9", "-3", "-2", "3", "9"],
+    correct: 0
+  },
+  {
+    question: "이차방정식 \\(x^2 + 6x + 7 = 0\\)의 두 근을 \\(\\alpha,\\beta\\)라 할 때, \\(\\alpha^2 + \\beta^2\\)의 값은?",
+    choices: ["14","16","18","20","22"],
+    correct: 4
+  },
+  {
+    question: "이차방정식 \\(x^2 - ax - 3a = 0\\) \\((a>0)\\)의 서로 다른 두 실근 \\(\\alpha,\\beta\\)에 대해 \\(\\lvert \\alpha\\rvert + \\lvert \\beta\\rvert = 8\\)일 때, \\(\\alpha^2 + \\beta^2\\)의 값은?",
+    choices: ["34","36","38","40","42"],
+    correct: 3
+  },
+  {
+    question: "이차방정식 \\(x^2 - 5x + 2 = 0\\)의 두 근을 \\(\\alpha,\\beta\\)라 할 때, \\(\\dfrac{1 + \\beta}{\\alpha} + \\dfrac{1 + \\alpha}{\\beta}\\)의 값은?",
+    choices: ["11","12","13","14","15"],
+    correct: 2
+  },
+  {
+    question: "두 수 \\(-1, 1\\)을 근으로 하고 \\(x^2\\)의 계수가 1인 이차방정식 \\(f(x)=0\\)이라 할 때, \\(f(2)\\)의 값은?",
+    choices: ["1","2","3","4","5"],
+    correct: 2
+  },
+  {
+    question: "\\(\\lvert x^2 - 3x - 4 \\rvert + \\lvert 2y^2 - y - 3 \\rvert = 0\\)을 만족시키는 \\(x,y\\)에 대하여 \\(x+y\\)의 최소값은?",
+    choices: ["-2","-1","0","1","2"],
+    correct: 0
+  },
+  {
+    question: "이차방정식 \\(x^2 + 2x + 3 = 0\\)의 서로 다른 두 근을 \\(\\alpha,\\beta\\)라 할 때, \\(\\dfrac{1}{\\alpha^2 + 3\\alpha + 3} + \\dfrac{1}{\\beta^2 + 3\\beta + 3}\\)의 값은?",
+    choices: ["-\\(\\dfrac{1}{3}\\)","-\\(\\dfrac{1}{2}\\)","-\\(\\dfrac{2}{3}\\)","-\\(\\dfrac{5}{6}\\)","-1"],
+    correct: 2
+  },
+  {
+    question: "이차방정식 \\(x^2 + ax + b = 0\\)의 두 근이 2와 8일 때, \\(a + b\\)의 값은?",
+    choices: ["3","4","5","6","7"],
+    correct: 3
+  },
+  {
+    question: "\\(x^2 - (a^2 - 3a - 18)x - a + 3 = 0\\)의 두 실근이 서로 부호가 반대이고 절댓값이 같도록 하는 \\(a\\)의 값은?",
+    choices: ["2","4","6","8","10"],
+    correct: 2
+  },
+  {
+    question: "이차방정식 \\(2x^2 + x - 4 = 0\\)의 두 근을 \\(\\alpha,\\beta\\)라 할 때, \\(\\alpha^2 + 1,\\; \\beta^2 + 1\\)을 근으로 하고 \\(x^2\\)의 계수가 4인 이차방정식은?",
+    choices: [
+      "\\(4x^2 - 24x + 35 = 0\\)",
+      "\\(4x^2 - 24x + 37 = 0\\)",
+      "\\(4x^2 - 25x + 35 = 0\\)",
+      "\\(4x^2 - 25x + 37 = 0\\)",
+      "\\(4x^2 - 26x + 35 = 0\\)"
+    ],
+    correct: 3
+  },
+  {
+    question: "함수 \\(f(x)\\)에 대하여 \\(f(x) + x - 1 = 0\\)의 두 근이 \\(\\alpha,\\beta\\)이고 \\(\\alpha + \\beta = 1,\\; \\alpha\\beta = -3\\)일 때, \\(f(1) = -6\\)이라면 \\(f(3)\\)의 값은?",
+    choices: ["2","3","4","5","6"],
+    correct: 2
+  },
+  {
+    question: "이차방정식 \\(x^2 + 3x - 2 = 0\\)의 두 근을 \\(\\alpha,\\beta\\)라 할 때, \\(2 + \\alpha,\\; 2 + \\beta\\)를 두 근으로 하는 \\(x^2 + a x + b = 0\\)에서 \\(a + b\\)는?",
+    choices: ["-5","-4","-3","-2","-1"],
+    correct: 0
+  },
+  {
+    question: "\\(x^2 + (m-5)x + (m-3) = 0\\)의 두 근이 모두 정수가 되도록 하는 모든 정수 \\(m\\)의 합은?",
+    choices: ["5","8","11","14","16"],
+    correct: 3
+  },
+  {
+    question: "이차방정식 \\(2x^2 - 12x + a = 0\\)의 두 근의 차가 2일 때, \\(a\\)의 값은?",
+    choices: ["8","10","12","14","16"],
+    correct: 4
+  },
+  {
+    question: "\\(x^2 - kx + 2k - 4 = 0\\)에서 한 근이 다른 근의 2배가 되도록 하는 모든 실수 \\(k\\)의 값의 합은?",
+    choices: ["1","5","9","13","17"],
+    correct: 2
+  },
+  {
+    question: "\\(x^2 + ax - 2 = 0\\)의 두 근이 1과 \\(b\\)일 때, 두 상수 \\(a,b\\)에 대하여 \\(a - b\\)는?",
+    choices: ["1","2","3","4","5"],
+    correct: 2
+  },
+  {
+    question: "이차방정식 \\(a x^2 + 4x + b = 0\\)의 두 근이 \\(-1\\)과 2일 때, \\(b x^2 - 2x + (b - a) = 0\\)의 두 근의 곱은?",
+    choices: ["\\(\\dfrac{3}{2}\\)","\\(\\dfrac{7}{4}\\)","5","3","4"],
+    correct: 0
+  },
+  {
+    question: "이차방정식 \\(x^2 - 2x - 5 = 0\\)의 두 근을 \\(\\alpha,\\beta\\)라 하자. \\(f(\\alpha) = \\beta,\\; f(\\beta) = \\alpha\\)를 만족하는 어떤 이차함수 \\(f(x)\\)에 대해, 방정식 \\(f(x) + x - 2 = 0\\)의 두 근의 합은?",
+    choices: ["-5","-1","0","2","4"],
+    correct: 3
+  },
+  {
+    question: "방정식 \\(\\lvert x+1\\rvert^2 + 3\\lvert x+1\\rvert - 4 = 0\\)의 두 근의 합은?",
+    choices: ["-3","-2","-1","0","1"],
+    correct: 1
+  },
+  {
+    question: "\\(x^2 - 9x + (k^2 + k) = 0\\)의 두 근의 차가 5가 되도록 하는 모든 실수 \\(k\\)의 곱은?",
+    choices: ["-16","-14","-12","-10","-8"],
+    correct: 1
+  },
+  {
+    question: "이차항의 계수가 1인 이차함수 \\(f(x)\\)에서 \\(f(x)=0\\)의 두 근의 곱이 7이고, \\(x^2 - 3x + 1=0\\)의 두 근 \\(\\alpha,\\beta\\)에 대해 \\(f(\\alpha)+ f(\\beta)=3\\)일 때, \\(f(7)\\)의 값은?",
+    choices: ["10","11","12","13","14"],
+    correct: 4
+  },
+  {
+    question: "\\(x^2 - 9x + a = 0\\)의 한 근이 다른 근의 2배가 되도록 하는 \\(a\\)의 값은?",
+    choices: ["16","18","20","24","25"],
+    correct: 1
+  }
+];
+
+// -- 전역 상태 --
+let currentIndex = 0;      // 문제 진행 인덱스 (첫 바퀴 용)
+let inRepeatMode = false;  // 한 바퀴 끝난 뒤 무작위 반복 여부
+let life = 3;
+let score = 0;
+let totalTime = 0;         // 전체 게임 시간(초)
+let questionTimer = null;  // 각 문제별 타이머
+let timeLeft = 0;          // 현재 문제 남은 시간
+let canProceed = false;    // "다음 문제" 버튼 활성화 여부
+let difficulty = "하";     // 난이도
+let difficultyTime = 0;    // 문제당 시간
+let difficultyScore = 10;  // 문제당 점수
+let playerName = "";
+
+// -- 난이도별 설정 --
+function applyDifficulty(diff) {
+  difficulty = diff;
+  switch(diff) {
+    case "최상":
+      difficultyTime = 20;
+      difficultyScore = 20;
+      break;
+    case "상":
+      difficultyTime = 30;
+      difficultyScore = 15;
+      break;
+    case "중":
+      difficultyTime = 40;
+      difficultyScore = 13;
+      break;
+    case "하":
+    default:
+      difficultyTime = 0;  // 무제한
+      difficultyScore = 10;
+      break;
+  }
+}
+
+// -- 배열 섞기 함수 --
+function shuffleArray(arr) {
+  for(let i = arr.length -1; i>0; i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+// -- 게임 시작 --
+function startGame() {
+  playerName = document.getElementById('playerName').value.trim();
+  if(!playerName) {
+    alert("이름을 입력하세요.");
+    return;
+  }
+  const diff = document.getElementById('difficultySelect').value;
+  applyDifficulty(diff);
+
+  document.getElementById('start-screen').classList.add('hidden');
+  document.getElementById('game-container').classList.remove('hidden');
+
+  // 문제 셔플
+  shuffleArray(problems);
+
+  life = 3;
+  score = 0;
+  currentIndex = 0;
+  inRepeatMode = false;
+  totalTime = 0;
+
+  document.getElementById('lifeCount').innerText = life;
+  document.getElementById('scoreDisplay').innerText = score;
+
+  // 전체 진행 시간 타이머
+  setInterval(()=>{
+    if(life>0) {
+      totalTime++;
+      document.getElementById('totalTimeDisplay').innerText = totalTime;
+    }
+  },1000);
+
+  // 첫 문제 표시
+  showQuestion();
+}
+
+// -- 문제 표시 --
+function showQuestion() {
+  clearQuestionTimer();
+
+  // 문제 선택 (첫 바퀴 or 무작위)
+  let problem;
+  if(!inRepeatMode) {
+    // 아직 첫 바퀴 중
+    problem = problems[currentIndex];
+  } else {
+    // 첫 바퀴 끝났으므로 무작위 선택
+    const randIndex = Math.floor(Math.random()*problems.length);
+    problem = problems[randIndex];
+  }
+
+  // 화면에 표시
+  document.getElementById('questionText').innerHTML = problem.question;
+  const choicesDiv = document.getElementById('choices');
+  choicesDiv.innerHTML = "";
+
+  // 보기 순서 섞기 (인덱스 배열)
+  const order = [0,1,2,3,4]; // 최대 5개 보기
+  shuffleArray(order);
+
+  // 생성
+  for(let i=0; i<order.length; i++){
+    const choiceIndex = order[i];
+    const btn = document.createElement('button');
+    btn.className = "choice-button";
+    btn.innerHTML = problem.choices[choiceIndex];
+    btn.onclick = () => {
+      if(!canProceed) {
+        // 답변 체크
+        clearQuestionTimer();
+        canProceed = true;
+        document.getElementById('nextButton').classList.remove('hidden');
+
+        if(choiceIndex === problem.correct){
+          // 정답
+          document.getElementById('feedback').innerHTML = "정답!";
+          score += difficultyScore;
+          document.getElementById('scoreDisplay').innerText = score;
+        } else {
+          // 오답
+          life--;
+          document.getElementById('lifeCount').innerText = life;
+          document.getElementById('feedback').innerHTML = 
+            "오답! 정답은 <b>"+ problem.choices[problem.correct]+"</b>";
+          if(life<=0){
+            endGame();
+          }
+        }
+      }
+    };
+    choicesDiv.appendChild(btn);
+  }
+
+  document.getElementById('feedback').innerHTML = "";
+  document.getElementById('nextButton').classList.add('hidden');
+  canProceed = false;
+
+  // 시간 제한 (난이도 하 제외)
+  const energyBar = document.getElementById('energyBarContainer');
+  if(difficultyTime>0 && life>0) {
+    energyBar.classList.remove('hidden');
+    timeLeft = difficultyTime;
+    questionTimer = setInterval(()=>{
+      timeLeft--;
+      updateEnergyBar();
+      if(timeLeft<=0){
+        // 시간 초과 => 오답 처리
+        clearQuestionTimer();
+        if(!canProceed){ // 아직 답을 안 골랐다면
+          life--;
+          document.getElementById('lifeCount').innerText = life;
+          // 정답 표시
+          document.getElementById('feedback').innerHTML =
+            "시간 초과! 정답은 <b>"+ problem.choices[problem.correct]+"</b>";
+          if(life<=0){
+            endGame();
+            return;
+          }
+        }
+        canProceed = true;
+        document.getElementById('nextButton').classList.remove('hidden');
+      }
+    },1000);
+    updateEnergyBar();
+  } else {
+    // 난이도 하(시간 제한 없음)
+    energyBar.classList.add('hidden');
+  }
+
+  // 수식 렌더링
+  setTimeout(()=>{ MathJax.typeset(); }, 0);
+}
+
+// -- 에너지바 갱신 --
+function updateEnergyBar(){
+  const bar = document.getElementById('energyBarFill');
+  if(difficultyTime>0) {
+    const fraction = Math.max(0, timeLeft/difficultyTime);
+    bar.style.width = (fraction*100) + "%";
+  }
+}
+
+// -- 문제 타이머 정리 --
+function clearQuestionTimer(){
+  if(questionTimer) {
+    clearInterval(questionTimer);
+    questionTimer = null;
+  }
+}
+
+// -- 다음 문제 버튼 --
+function handleNext(){
+  if(!canProceed) return; // 아직 답변이 확정되지 않음
+
+  if(life<=0){
+    endGame();
+    return;
+  }
+
+  // 다음 문제 인덱스
+  if(!inRepeatMode){
+    currentIndex++;
+    if(currentIndex>=problems.length){
+      // 한 바퀴 끝
+      inRepeatMode = true;
+    }
+  }
+  showQuestion();
+}
+
+// -- 게임 종료 --
+function endGame(){
+  clearQuestionTimer();
+  document.getElementById('game-container').classList.add('hidden');
+  document.getElementById('end-screen').classList.remove('hidden');
+  document.getElementById('finalScore').innerText = score;
+  document.getElementById('finalTime').innerText = totalTime;
+}
+
+// -- 점수 전송 --
+function sendScore(){
+  saveData("이차방정식 빈출 (2)", playerName, score, totalTime);
+}
+
+// -- 주어진 코드 (서버 전송) --
+async function saveData(game, name, score, elapsedTime) {
+  const FUNCTION_URL = "https://us-central1-record-f420d.cloudfunctions.net/report";
+  const requestData = {
+      game,
+      name,
+      score: parseInt(score, 10),
+      elapsedTime: parseInt(elapsedTime, 10)
+  };
+
+  try {
+      const response = await fetch(FUNCTION_URL, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestData)
+      });
+
+      const responseData = await response.json();
+
+      if (response.ok) {
+          document.getElementById('response').innerText = 
+            "성공: " + JSON.stringify(responseData, null, 2);
+      } else {
+          document.getElementById('response').innerText = 
+            "오류: " + JSON.stringify(responseData, null, 2);
+      }
+  } catch (error) {
+      console.error('요청 실패:', error);
+      document.getElementById('response').innerText = 
+        "네트워크 오류: " + error.message;
+  }
+}
+</script>
+
+</body>
+</html>
